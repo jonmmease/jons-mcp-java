@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from jons_mcp_java.server import manager, mcp
+from jons_mcp_java.server import get_manager, mcp
 from jons_mcp_java.utils import uri_to_path
 
 
@@ -20,6 +20,7 @@ async def diagnostics(
     Returns:
         Dictionary with 'diagnostics' array containing formatted diagnostic info
     """
+    manager = get_manager()
     if manager is None:
         return {"status": "error", "message": "Server not initialized"}
 

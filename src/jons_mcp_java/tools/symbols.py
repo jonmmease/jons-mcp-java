@@ -6,7 +6,7 @@ from jons_mcp_java.constants import (
     LSP_TEXT_DOCUMENT_DOCUMENT_SYMBOL,
     LSP_WORKSPACE_SYMBOL,
 )
-from jons_mcp_java.server import manager, mcp
+from jons_mcp_java.server import get_manager, mcp
 from jons_mcp_java.utils import format_symbol, path_to_uri
 
 
@@ -23,6 +23,7 @@ async def document_symbols(
     Returns:
         Dictionary with 'symbols' array or 'status'/'message' if initializing
     """
+    manager = get_manager()
     if manager is None:
         return {"status": "error", "message": "Server not initialized"}
 
@@ -63,6 +64,7 @@ async def workspace_symbols(
     Returns:
         Dictionary with 'symbols' array or 'status'/'message' if initializing
     """
+    manager = get_manager()
     if manager is None:
         return {"status": "error", "message": "Server not initialized"}
 

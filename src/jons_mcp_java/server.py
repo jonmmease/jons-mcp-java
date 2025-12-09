@@ -11,15 +11,20 @@ from jons_mcp_java.manager import JdtlsClientManager
 
 logger = logging.getLogger(__name__)
 
-# Global manager instance
-manager: JdtlsClientManager | None = None
+
+class _ManagerHolder:
+    """Holder class to allow tools to access the manager after lifespan init."""
+    instance: JdtlsClientManager | None = None
+
+
+def get_manager() -> JdtlsClientManager | None:
+    """Get the current manager instance."""
+    return _ManagerHolder.instance
 
 
 @asynccontextmanager
 async def lifespan(app: FastMCP):
     """Lifespan context manager for the MCP server."""
-    global manager
-
     # Get workspace root from environment or arguments
     workspace_root = os.environ.get("JONS_MCP_JAVA_WORKSPACE")
     if not workspace_root:
@@ -31,6 +36,7 @@ async def lifespan(app: FastMCP):
 
     # Initialize manager
     manager = JdtlsClientManager(workspace_path)
+    _ManagerHolder.instance = manager
 
     # Discover projects
     projects = manager.discover_projects()
@@ -42,8 +48,9 @@ async def lifespan(app: FastMCP):
     yield {"manager": manager}
 
     # Shutdown
-    if manager:
-        await manager.shutdown_all()
+    if _ManagerHolder.instance:
+        await _ManagerHolder.instance.shutdown_all()
+        _ManagerHolder.instance = None
     logger.info("jons-mcp-java shut down")
 
 

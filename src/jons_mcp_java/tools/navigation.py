@@ -8,7 +8,7 @@ from jons_mcp_java.constants import (
     LSP_TEXT_DOCUMENT_REFERENCES,
     LSP_TEXT_DOCUMENT_TYPE_DEFINITION,
 )
-from jons_mcp_java.server import manager, mcp
+from jons_mcp_java.server import get_manager, mcp
 from jons_mcp_java.utils import format_locations, path_to_uri
 
 
@@ -29,6 +29,7 @@ async def definition(
     Returns:
         Dictionary with 'locations' array or 'status'/'message' if initializing
     """
+    manager = get_manager()
     if manager is None:
         return {"status": "error", "message": "Server not initialized"}
 
@@ -72,6 +73,7 @@ async def references(
     Returns:
         Dictionary with 'locations' array or 'status'/'message' if initializing
     """
+    manager = get_manager()
     if manager is None:
         return {"status": "error", "message": "Server not initialized"}
 
@@ -111,6 +113,7 @@ async def implementation(
     Returns:
         Dictionary with 'locations' array or 'status'/'message' if initializing
     """
+    manager = get_manager()
     if manager is None:
         return {"status": "error", "message": "Server not initialized"}
 
@@ -149,6 +152,7 @@ async def type_definition(
     Returns:
         Dictionary with 'locations' array or 'status'/'message' if initializing
     """
+    manager = get_manager()
     if manager is None:
         return {"status": "error", "message": "Server not initialized"}
 
