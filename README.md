@@ -31,6 +31,15 @@ To set the workspace root (defaults to current directory):
 claude mcp add jons-mcp-java -e JONS_MCP_JAVA_WORKSPACE=/path/to/workspace -- uv run --project /path/to/jons-mcp-java jons-mcp-java
 ```
 
+If your project uses a specific Java version (e.g., via devbox), set `JAVA_HOME`:
+
+```bash
+claude mcp add jons-mcp-java \
+  -e JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
+  -e JONS_MCP_JAVA_WORKSPACE=/path/to/workspace \
+  -- uv run --project /path/to/jons-mcp-java jons-mcp-java
+```
+
 ## Available Tools
 
 | Tool | Description |
