@@ -1,6 +1,6 @@
 """Navigation tools: definition, references, implementation, type_definition."""
 
-from pathlib import Path
+from typing import Any
 
 from jons_mcp_java.constants import (
     LSP_TEXT_DOCUMENT_DEFINITION,
@@ -8,8 +8,47 @@ from jons_mcp_java.constants import (
     LSP_TEXT_DOCUMENT_REFERENCES,
     LSP_TEXT_DOCUMENT_TYPE_DEFINITION,
 )
-from jons_mcp_java.server import get_manager, mcp
-from jons_mcp_java.utils import format_locations, path_to_uri
+from jons_mcp_java.server import mcp
+from jons_mcp_java.tools.common import (
+    exception_response,
+    prepare_file_tool,
+    validate_position,
+)
+from jons_mcp_java.utils import format_locations
+
+
+async def _navigation_request(
+    method: str,
+    file_path: str,
+    line: int,
+    character: int,
+    extra_params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    position_error = validate_position(line, character)
+    if position_error is not None:
+        return position_error
+
+    context, error = await prepare_file_tool(file_path)
+    if error is not None or context is None:
+        return error or {}
+
+    params: dict[str, Any] = {
+        "textDocument": {"uri": context.resolved.uri},
+        "position": {"line": line, "character": character},
+    }
+    if extra_params:
+        params.update(extra_params)
+
+    try:
+        response = await context.client.request(method, params)
+    except Exception as exc:
+        return exception_response(
+            exc,
+            path=str(context.resolved.path),
+            project=context.project,
+        )
+
+    return format_locations(response, context.manager.workspace_root)
 
 
 @mcp.tool()
@@ -17,41 +56,14 @@ async def definition(
     file_path: str,
     line: int,
     character: int,
-) -> dict:
-    """
-    Navigate to the definition of a symbol at the given position.
-
-    Args:
-        file_path: Absolute path to the Java file
-        line: 0-indexed line number
-        character: 0-indexed character position
-
-    Returns:
-        Dictionary with 'locations' array or 'status'/'message' if initializing
-    """
-    manager = get_manager()
-    if manager is None:
-        return {"status": "error", "message": "Server not initialized"}
-
-    # Get client with status feedback
-    client, status = await manager.get_client_for_file_with_status(Path(file_path))
-
-    if client is None:
-        return {"status": "initializing", "message": status}
-
-    # Ensure file is open
-    await client.ensure_file_open(file_path)
-
-    # Make LSP request
-    response = await client.request(
+) -> dict[str, Any]:
+    """Navigate to the definition of a symbol at the given position."""
+    return await _navigation_request(
         LSP_TEXT_DOCUMENT_DEFINITION,
-        {
-            "textDocument": {"uri": path_to_uri(file_path)},
-            "position": {"line": line, "character": character}
-        }
+        file_path,
+        line,
+        character,
     )
-
-    return format_locations(response)
 
 
 @mcp.tool()
@@ -60,40 +72,15 @@ async def references(
     line: int,
     character: int,
     include_declaration: bool = True,
-) -> dict:
-    """
-    Find all references to the symbol at the given position.
-
-    Args:
-        file_path: Absolute path to the Java file
-        line: 0-indexed line number
-        character: 0-indexed character position
-        include_declaration: Whether to include the declaration in results
-
-    Returns:
-        Dictionary with 'locations' array or 'status'/'message' if initializing
-    """
-    manager = get_manager()
-    if manager is None:
-        return {"status": "error", "message": "Server not initialized"}
-
-    client, status = await manager.get_client_for_file_with_status(Path(file_path))
-
-    if client is None:
-        return {"status": "initializing", "message": status}
-
-    await client.ensure_file_open(file_path)
-
-    response = await client.request(
+) -> dict[str, Any]:
+    """Find all references to the symbol at the given position."""
+    return await _navigation_request(
         LSP_TEXT_DOCUMENT_REFERENCES,
-        {
-            "textDocument": {"uri": path_to_uri(file_path)},
-            "position": {"line": line, "character": character},
-            "context": {"includeDeclaration": include_declaration}
-        }
+        file_path,
+        line,
+        character,
+        {"context": {"includeDeclaration": include_declaration}},
     )
-
-    return format_locations(response)
 
 
 @mcp.tool()
@@ -101,38 +88,14 @@ async def implementation(
     file_path: str,
     line: int,
     character: int,
-) -> dict:
-    """
-    Find implementations of an interface or abstract method.
-
-    Args:
-        file_path: Absolute path to the Java file
-        line: 0-indexed line number
-        character: 0-indexed character position
-
-    Returns:
-        Dictionary with 'locations' array or 'status'/'message' if initializing
-    """
-    manager = get_manager()
-    if manager is None:
-        return {"status": "error", "message": "Server not initialized"}
-
-    client, status = await manager.get_client_for_file_with_status(Path(file_path))
-
-    if client is None:
-        return {"status": "initializing", "message": status}
-
-    await client.ensure_file_open(file_path)
-
-    response = await client.request(
+) -> dict[str, Any]:
+    """Find implementations of an interface or abstract method."""
+    return await _navigation_request(
         LSP_TEXT_DOCUMENT_IMPLEMENTATION,
-        {
-            "textDocument": {"uri": path_to_uri(file_path)},
-            "position": {"line": line, "character": character}
-        }
+        file_path,
+        line,
+        character,
     )
-
-    return format_locations(response)
 
 
 @mcp.tool()
@@ -140,35 +103,11 @@ async def type_definition(
     file_path: str,
     line: int,
     character: int,
-) -> dict:
-    """
-    Navigate to the type definition of a symbol at the given position.
-
-    Args:
-        file_path: Absolute path to the Java file
-        line: 0-indexed line number
-        character: 0-indexed character position
-
-    Returns:
-        Dictionary with 'locations' array or 'status'/'message' if initializing
-    """
-    manager = get_manager()
-    if manager is None:
-        return {"status": "error", "message": "Server not initialized"}
-
-    client, status = await manager.get_client_for_file_with_status(Path(file_path))
-
-    if client is None:
-        return {"status": "initializing", "message": status}
-
-    await client.ensure_file_open(file_path)
-
-    response = await client.request(
+) -> dict[str, Any]:
+    """Navigate to the type definition of a symbol at the given position."""
+    return await _navigation_request(
         LSP_TEXT_DOCUMENT_TYPE_DEFINITION,
-        {
-            "textDocument": {"uri": path_to_uri(file_path)},
-            "position": {"line": line, "character": character}
-        }
+        file_path,
+        line,
+        character,
     )
-
-    return format_locations(response)

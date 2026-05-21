@@ -37,8 +37,8 @@ def discover_gradle_roots(workspace_root: Path) -> list[Path]:
     Discover Gradle project roots in the workspace.
 
     A Gradle root is defined by the presence of settings.gradle(.kts) or
-    build.gradle(.kts). We find the highest-level Gradle files (roots) and
-    don't descend into subprojects.
+    build.gradle(.kts). Nested roots are included so callers can route files
+    to the deepest matching project.
 
     Returns a sorted list of Path objects.
     """
@@ -61,22 +61,17 @@ def _scan_for_gradle_roots(
     directory: Path,
     roots: list[Path],
     depth: int,
-) -> bool:
-    """
-    Recursively scan for Gradle roots.
-
-    Returns True if this directory is a Gradle root (to prevent descending into subprojects).
-    """
+) -> None:
+    """Recursively scan for Gradle roots."""
     if depth > MAX_SCAN_DEPTH:
-        return False
+        return
 
     # Check if this directory is a Gradle root
     is_gradle_root = _is_gradle_root(directory)
 
     if is_gradle_root:
         roots.append(directory)
-        # Don't descend into subprojects of this root
-        return True
+        # Keep scanning; manager routing chooses the deepest project match.
 
     # Scan subdirectories
     try:
@@ -85,8 +80,6 @@ def _scan_for_gradle_roots(
                 _scan_for_gradle_roots(child, roots, depth + 1)
     except PermissionError:
         logger.debug(f"Permission denied scanning: {directory}")
-
-    return False
 
 
 def _is_gradle_root(directory: Path) -> bool:

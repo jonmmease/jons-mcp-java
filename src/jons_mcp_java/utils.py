@@ -2,7 +2,10 @@
 
 import hashlib
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote, unquote, urlparse
+
+from jons_mcp_java.paths import is_in_workspace
 
 
 def path_to_uri(path: str | Path) -> str:
@@ -35,7 +38,7 @@ def uri_to_path(uri: str) -> Path:
     return Path(path_str)
 
 
-def format_locations(response: dict | list | None) -> dict:
+def format_locations(response: dict | list | None, workspace_root: Path | None = None) -> dict:
     """
     Normalize LSP Location response to a consistent format.
 
@@ -52,15 +55,21 @@ def format_locations(response: dict | list | None) -> dict:
 
     if isinstance(response, dict):
         # Single Location or LocationLink
-        return {"locations": [_normalize_location(response)]}
+        return {"locations": [_normalize_location(response, workspace_root)]}
 
     if isinstance(response, list):
-        return {"locations": [_normalize_location(loc) for loc in response]}
+        return {
+            "locations": [
+                _normalize_location(loc, workspace_root)
+                for loc in response
+                if isinstance(loc, dict)
+            ]
+        }
 
     return {"locations": []}
 
 
-def _normalize_location(loc: dict) -> dict:
+def _normalize_location(loc: dict[str, Any], workspace_root: Path | None) -> dict:
     """Normalize a Location or LocationLink to a common format."""
     # LocationLink has targetUri/targetRange, Location has uri/range
     if "targetUri" in loc:
@@ -73,8 +82,12 @@ def _normalize_location(loc: dict) -> dict:
         range_obj = loc.get("range", {})
 
     # Convert URI to path for easier consumption
+    in_workspace = False
     try:
-        path = str(uri_to_path(uri))
+        path_obj = uri_to_path(uri)
+        path = str(path_obj)
+        if workspace_root is not None:
+            in_workspace = is_in_workspace(path_obj, workspace_root)
     except ValueError:
         path = uri
 
@@ -88,6 +101,7 @@ def _normalize_location(loc: dict) -> dict:
         "character": start.get("character", 0),
         "end_line": end.get("line", 0),
         "end_character": end.get("character", 0),
+        "in_workspace": in_workspace,
     }
 
 
@@ -103,7 +117,11 @@ def get_workspace_data_dir(project_root: Path) -> Path:
     return Path.home() / ".cache" / "jdtls-workspaces" / f"{project_name}-{path_hash}"
 
 
-def format_symbol(symbol: dict, include_children: bool = True) -> dict:
+def format_symbol(
+    symbol: dict[str, Any],
+    include_children: bool = True,
+    workspace_root: Path | None = None,
+) -> dict:
     """Format a DocumentSymbol or SymbolInformation to a common format."""
     # DocumentSymbol has range, SymbolInformation has location
     if "location" in symbol:
@@ -111,13 +129,18 @@ def format_symbol(symbol: dict, include_children: bool = True) -> dict:
         loc = symbol["location"]
         uri = loc.get("uri", "")
         range_obj = loc.get("range", {})
+        in_workspace = False
         try:
-            path = str(uri_to_path(uri))
+            path_obj = uri_to_path(uri)
+            path = str(path_obj)
+            if workspace_root is not None:
+                in_workspace = is_in_workspace(path_obj, workspace_root)
         except ValueError:
             path = uri
     else:
         # DocumentSymbol (no path, just range within current file)
         path = None
+        in_workspace = True
         range_obj = symbol.get("range", {})
 
     start = range_obj.get("start", {})
@@ -132,6 +155,7 @@ def format_symbol(symbol: dict, include_children: bool = True) -> dict:
 
     if path:
         result["path"] = path
+        result["in_workspace"] = in_workspace
 
     # Include container name if present (SymbolInformation)
     if "containerName" in symbol:
@@ -140,7 +164,11 @@ def format_symbol(symbol: dict, include_children: bool = True) -> dict:
     # Include children if present (DocumentSymbol hierarchy)
     if include_children and "children" in symbol:
         result["children"] = [
-            format_symbol(child, include_children=True)
+            format_symbol(
+                child,
+                include_children=True,
+                workspace_root=workspace_root,
+            )
             for child in symbol["children"]
         ]
 

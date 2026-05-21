@@ -2,8 +2,10 @@
 
 import logging
 import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastmcp import FastMCP
 
@@ -23,7 +25,7 @@ def get_manager() -> JdtlsClientManager | None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastMCP):
+async def lifespan(app: FastMCP) -> AsyncIterator[dict[str, Any]]:
     """Lifespan context manager for the MCP server."""
     # Get workspace root from environment or arguments
     workspace_root = os.environ.get("JONS_MCP_JAVA_WORKSPACE")
@@ -32,7 +34,7 @@ async def lifespan(app: FastMCP):
         workspace_root = os.getcwd()
 
     workspace_path = Path(workspace_root).resolve()
-    logger.info(f"Starting jons-mcp-java with workspace: {workspace_path}")
+    logger.info("Starting jons-mcp-java with workspace: %s", workspace_path)
 
     # Initialize manager
     manager = JdtlsClientManager(workspace_path)
@@ -41,9 +43,9 @@ async def lifespan(app: FastMCP):
     # Discover projects
     projects = manager.discover_projects()
     if projects:
-        logger.info(f"Discovered projects: {[str(p) for p in projects]}")
+        logger.info("Discovered projects: %s", [str(p) for p in projects])
     else:
-        logger.warning(f"No Gradle projects found in {workspace_path}")
+        logger.warning("No Gradle projects found in %s", workspace_path)
 
     yield {"manager": manager}
 
@@ -62,4 +64,4 @@ mcp = FastMCP(
 
 
 # Import tools to register them
-from jons_mcp_java.tools import navigation, symbols, diagnostics, info  # noqa: E402, F401
+from jons_mcp_java.tools import diagnostics, extensions, info, navigation, symbols  # noqa: E402, F401, I001

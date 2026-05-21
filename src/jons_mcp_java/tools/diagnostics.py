@@ -1,54 +1,80 @@
 """Diagnostics tool."""
 
-from pathlib import Path
+from typing import Any
 
-from jons_mcp_java.server import get_manager, mcp
+from jons_mcp_java.server import mcp
+from jons_mcp_java.tools.common import (
+    error_response,
+    exception_response,
+    manager_or_error,
+    workspace_path_or_error,
+)
 from jons_mcp_java.utils import uri_to_path
 
 
 @mcp.tool()
-async def diagnostics(
-    file_path: str | None = None,
-) -> dict:
-    """
-    Get diagnostics (errors, warnings) for a file or all files.
-
-    Args:
-        file_path: Optional path to get diagnostics for a specific file.
-                  If not provided, returns diagnostics for all files.
-
-    Returns:
-        Dictionary with 'diagnostics' array containing formatted diagnostic info
-    """
-    manager = get_manager()
-    if manager is None:
-        return {"status": "error", "message": "Server not initialized"}
+async def diagnostics(file_path: str | None = None) -> dict[str, Any]:
+    """Get diagnostics for a file or all initialized projects."""
+    manager, error = manager_or_error()
+    if error is not None or manager is None:
+        return error or {}
 
     if file_path:
-        # Get diagnostics for specific file
-        raw_diagnostics = manager.get_diagnostics(Path(file_path))
-        formatted = _format_diagnostics(file_path, raw_diagnostics)
+        path, path_error = workspace_path_or_error(manager, file_path)
+        if path_error is not None or path is None:
+            return path_error or {}
+
+        status = await manager.get_client_for_file_with_status(path)
+        if status.status == "initializing":
+            return {
+                "status": "initializing",
+                "message": status.message,
+                "project": status.project,
+            }
+        if status.status != "ready" or status.client is None:
+            return error_response(
+                status.error_type or status.status,
+                status.message,
+                path=str(path),
+                project=status.project,
+            )
+
+        waiter = manager.create_diagnostics_waiter(path)
+        try:
+            changed = await status.client.ensure_file_open(path)
+        except Exception as exc:
+            manager.cancel_diagnostics_waiter(path, waiter)
+            return exception_response(exc, path=str(path), project=status.project)
+
+        if changed:
+            raw_diagnostics = await manager.wait_for_diagnostics(path, waiter)
+        else:
+            manager.cancel_diagnostics_waiter(path, waiter)
+            raw_diagnostics = manager.get_diagnostics(path)
+
+        formatted = _format_diagnostics(str(path), raw_diagnostics)
         return {"diagnostics": formatted}
-    else:
-        # Get all diagnostics
-        all_raw = manager.get_all_diagnostics()
-        all_formatted = []
-        for uri, diags in all_raw.items():
-            try:
-                path = str(uri_to_path(uri))
-            except ValueError:
-                path = uri
-            all_formatted.extend(_format_diagnostics(path, diags))
 
-        return {"diagnostics": all_formatted}
+    all_formatted = []
+    for uri, diags in manager.get_all_diagnostics().items():
+        try:
+            diagnostic_path = str(uri_to_path(uri))
+        except ValueError:
+            diagnostic_path = uri
+        all_formatted.extend(_format_diagnostics(diagnostic_path, diags))
+
+    return {"diagnostics": sorted(all_formatted, key=_diagnostic_sort_key)}
 
 
-def _format_diagnostics(file_path: str, diagnostics: list) -> list[dict]:
+def _format_diagnostics(
+    file_path: str,
+    diagnostics: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     """Format LSP diagnostics to a user-friendly format."""
     result = []
     for diag in diagnostics:
         range_obj = diag.get("range", {})
-        start = range_obj.get("start", {})
+        start = range_obj.get("start", {}) if isinstance(range_obj, dict) else {}
 
         severity = diag.get("severity", 1)
         severity_name = {
@@ -58,14 +84,32 @@ def _format_diagnostics(file_path: str, diagnostics: list) -> list[dict]:
             4: "hint",
         }.get(severity, "unknown")
 
-        result.append({
-            "file": file_path,
-            "line": start.get("line", 0),
-            "character": start.get("character", 0),
-            "severity": severity_name,
-            "message": diag.get("message", ""),
-            "source": diag.get("source", "jdtls"),
-            "code": diag.get("code"),
-        })
+        result.append(
+            {
+                "file": file_path,
+                "line": start.get("line", 0),
+                "character": start.get("character", 0),
+                "severity": severity_name,
+                "message": diag.get("message", ""),
+                "source": diag.get("source", "jdtls"),
+                "code": diag.get("code"),
+            }
+        )
 
-    return result
+    return sorted(result, key=_diagnostic_sort_key)
+
+
+def _diagnostic_sort_key(diagnostic: dict[str, Any]) -> tuple[str, int, int, str, str]:
+    return (
+        str(diagnostic.get("file", "")),
+        _safe_int(diagnostic.get("line", 0)),
+        _safe_int(diagnostic.get("character", 0)),
+        str(diagnostic.get("severity", "")),
+        str(diagnostic.get("message", "")),
+    )
+
+
+def _safe_int(value: object) -> int:
+    if isinstance(value, int):
+        return value
+    return 0

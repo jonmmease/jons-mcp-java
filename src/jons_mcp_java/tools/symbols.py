@@ -1,51 +1,51 @@
 """Symbol tools: document_symbols, workspace_symbols."""
 
-from pathlib import Path
+from typing import Any
 
 from jons_mcp_java.constants import (
     LSP_TEXT_DOCUMENT_DOCUMENT_SYMBOL,
     LSP_WORKSPACE_SYMBOL,
 )
-from jons_mcp_java.server import get_manager, mcp
-from jons_mcp_java.utils import format_symbol, path_to_uri
+from jons_mcp_java.server import mcp
+from jons_mcp_java.tools.common import (
+    exception_response,
+    manager_or_error,
+    prepare_file_tool,
+    workspace_path_or_error,
+)
+from jons_mcp_java.utils import format_symbol
 
 
 @mcp.tool()
-async def document_symbols(
-    file_path: str,
-) -> dict:
-    """
-    Get all symbols defined in a Java file.
+async def document_symbols(file_path: str) -> dict[str, Any]:
+    """Get all symbols defined in a Java file."""
+    context, error = await prepare_file_tool(file_path)
+    if error is not None or context is None:
+        return error or {}
 
-    Args:
-        file_path: Absolute path to the Java file
-
-    Returns:
-        Dictionary with 'symbols' array or 'status'/'message' if initializing
-    """
-    manager = get_manager()
-    if manager is None:
-        return {"status": "error", "message": "Server not initialized"}
-
-    client, status = await manager.get_client_for_file_with_status(Path(file_path))
-
-    if client is None:
-        return {"status": "initializing", "message": status}
-
-    await client.ensure_file_open(file_path)
-
-    response = await client.request(
-        LSP_TEXT_DOCUMENT_DOCUMENT_SYMBOL,
-        {
-            "textDocument": {"uri": path_to_uri(file_path)},
-        }
-    )
+    try:
+        response = await context.client.request(
+            LSP_TEXT_DOCUMENT_DOCUMENT_SYMBOL,
+            {"textDocument": {"uri": context.resolved.uri}},
+        )
+    except Exception as exc:
+        return exception_response(
+            exc,
+            path=str(context.resolved.path),
+            project=context.project,
+        )
 
     if response is None:
         return {"symbols": []}
 
-    # Response is either DocumentSymbol[] or SymbolInformation[]
-    symbols = [format_symbol(sym) for sym in response]
+    if not isinstance(response, list):
+        return {"symbols": []}
+
+    symbols = [
+        format_symbol(sym, workspace_root=context.manager.workspace_root)
+        for sym in response
+        if isinstance(sym, dict)
+    ]
     return {"symbols": symbols}
 
 
@@ -53,50 +53,57 @@ async def document_symbols(
 async def workspace_symbols(
     query: str,
     file_path: str | None = None,
-) -> dict:
-    """
-    Search for symbols in the workspace.
-
-    Args:
-        query: Search query string (symbol name or pattern)
-        file_path: Optional file path to determine which project to search
-
-    Returns:
-        Dictionary with 'symbols' array or 'status'/'message' if initializing
-    """
-    manager = get_manager()
-    if manager is None:
-        return {"status": "error", "message": "Server not initialized"}
-
-    # If file_path provided, use that project; otherwise use first available
-    if file_path:
-        client, status = await manager.get_client_for_file_with_status(Path(file_path))
-    else:
-        # Get any initialized client
-        for project in manager._projects.values():
-            if project.client and project.client.is_initialized:
-                client = project.client
-                status = "ready"
-                break
-        else:
-            return {
-                "status": "error",
-                "message": "No initialized projects. Provide a file_path to start initialization."
-            }
-
-    if client is None:
-        return {"status": "initializing", "message": status}
-
-    response = await client.request(
-        LSP_WORKSPACE_SYMBOL,
-        {
-            "query": query,
+) -> dict[str, Any]:
+    """Search for symbols in an initialized project workspace."""
+    if not isinstance(query, str):
+        return {
+            "status": "error",
+            "error": {
+                "type": "invalid_query",
+                "message": "query must be a string.",
+            },
         }
-    )
 
-    if response is None:
+    manager, error = manager_or_error()
+    if error is not None or manager is None:
+        return error or {}
+
+    if file_path:
+        path, path_error = workspace_path_or_error(manager, file_path)
+        if path_error is not None or path is None:
+            return path_error or {}
+        status = await manager.get_client_for_file_with_status(path)
+    else:
+        status = manager.get_initialized_client()
+
+    if status.status == "initializing":
+        return {
+            "status": "initializing",
+            "message": status.message,
+            "project": status.project,
+        }
+    if status.status != "ready" or status.client is None:
+        return {
+            "status": "error",
+            "error": {
+                "type": status.error_type or status.status,
+                "message": status.message,
+                "project": status.project,
+            },
+        }
+
+    try:
+        response = await status.client.request(LSP_WORKSPACE_SYMBOL, {"query": query})
+    except Exception as exc:
+        return exception_response(exc, project=status.project)
+
+    if response is None or not isinstance(response, list):
         return {"symbols": []}
 
-    # Response is SymbolInformation[]
-    symbols = [format_symbol(sym) for sym in response]
+    symbols = [
+        format_symbol(sym, workspace_root=manager.workspace_root)
+        for sym in response
+        if isinstance(sym, dict)
+    ]
+
     return {"symbols": symbols}

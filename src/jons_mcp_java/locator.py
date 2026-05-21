@@ -227,7 +227,7 @@ def _validate_java_version(java_path: Path) -> None:
             timeout=10,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-        raise JavaVersionError(f"Could not run Java: {e}")
+        raise JavaVersionError(f"Could not run Java: {e}") from e
 
     # Java version is on stderr
     version_output = result.stderr
