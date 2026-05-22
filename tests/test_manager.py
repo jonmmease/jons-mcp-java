@@ -108,7 +108,7 @@ async def test_restart_project_clears_runtime_state(tmp_path: Path) -> None:
     result = await manager.restart_project_for_file(java_file)
 
     assert result["status"] == "success"
-    assert result["was_running"] is True
+    assert result["wasRunning"] is True
     assert project.client is None
     assert project.diagnostics == {}
     assert client.shutdown_called is True

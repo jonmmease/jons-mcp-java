@@ -18,6 +18,8 @@ LSP_TEXT_DOCUMENT_IMPLEMENTATION = "textDocument/implementation"
 LSP_TEXT_DOCUMENT_HOVER = "textDocument/hover"
 LSP_TEXT_DOCUMENT_DOCUMENT_SYMBOL = "textDocument/documentSymbol"
 LSP_TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS = "textDocument/publishDiagnostics"
+LSP_TEXT_DOCUMENT_PREPARE_RENAME = "textDocument/prepareRename"
+LSP_TEXT_DOCUMENT_RENAME = "textDocument/rename"
 
 # Workspace methods
 LSP_WORKSPACE_SYMBOL = "workspace/symbol"
@@ -48,3 +50,7 @@ JDTLS_MEMORY = "1G"
 
 # Java minimum version
 JAVA_MIN_VERSION = 21
+
+# Pagination defaults
+DEFAULT_LIMIT = 20
+DEFAULT_OFFSET = 0

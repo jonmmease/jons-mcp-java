@@ -30,18 +30,20 @@ From a source checkout:
 git clone git@github.com:jonmmease/jons-mcp-java.git
 cd jons-mcp-java
 uv sync
-uv run jons-mcp-java
+uv run jons-mcp-java /path/to/java-workspace
 ```
 
 From GitHub without a persistent checkout:
 
 ```bash
-uvx --from git+https://github.com/jonmmease/jons-mcp-java.git jons-mcp-java
+uvx --from git+https://github.com/jonmmease/jons-mcp-java.git \
+  jons-mcp-java /path/to/java-workspace
 ```
 
-Set `JONS_MCP_JAVA_WORKSPACE` to the Java workspace you want the server to
-analyze. If omitted, the server uses the MCP process current working directory.
-All relative tool paths are resolved from this workspace root.
+Pass the Java workspace root as the optional positional argument, or set
+`JONS_MCP_JAVA_WORKSPACE`. The positional argument takes precedence. If neither
+is provided, the server uses the MCP process current working directory. All
+relative tool paths are resolved from this workspace root.
 
 ## MCP Client Examples
 
@@ -49,24 +51,24 @@ Claude Code using a source checkout:
 
 ```bash
 claude mcp add jons-mcp-java \
-  -e JONS_MCP_JAVA_WORKSPACE=/path/to/java-workspace \
-  -- uv run --project /path/to/jons-mcp-java jons-mcp-java
+  -- uv run --project /path/to/jons-mcp-java \
+  jons-mcp-java /path/to/java-workspace
 ```
 
 Claude Code using GitHub:
 
 ```bash
 claude mcp add jons-mcp-java \
-  -e JONS_MCP_JAVA_WORKSPACE=/path/to/java-workspace \
-  -- uvx --from git+https://github.com/jonmmease/jons-mcp-java.git jons-mcp-java
+  -- uvx --from git+https://github.com/jonmmease/jons-mcp-java.git \
+  jons-mcp-java /path/to/java-workspace
 ```
 
 Codex CLI using GitHub:
 
 ```bash
 codex mcp add jons-mcp-java \
-  -e JONS_MCP_JAVA_WORKSPACE=/path/to/java-workspace \
-  -- uvx --from git+https://github.com/jonmmease/jons-mcp-java.git jons-mcp-java
+  -- uvx --from git+https://github.com/jonmmease/jons-mcp-java.git \
+  jons-mcp-java /path/to/java-workspace
 ```
 
 `.mcp.json`:
@@ -79,11 +81,9 @@ codex mcp add jons-mcp-java \
       "args": [
         "--from",
         "git+https://github.com/jonmmease/jons-mcp-java.git",
-        "jons-mcp-java"
-      ],
-      "env": {
-        "JONS_MCP_JAVA_WORKSPACE": "/path/to/java-workspace"
-      }
+        "jons-mcp-java",
+        "/path/to/java-workspace"
+      ]
     }
   }
 }
@@ -98,10 +98,8 @@ args = [
   "--from",
   "git+https://github.com/jonmmease/jons-mcp-java.git",
   "jons-mcp-java",
+  "/path/to/java-workspace",
 ]
-
-[mcp_servers.jons-mcp-java.env]
-JONS_MCP_JAVA_WORKSPACE = "/path/to/java-workspace"
 ```
 
 ## Workspace and Path Behavior
@@ -141,8 +139,9 @@ Path and startup failures use a stable error shape:
 | `type_definition` | Go to type definition |
 | `document_symbols` | List symbols in a file |
 | `workspace_symbols` | Search symbols in an initialized project |
-| `diagnostics` | Get cached or freshly refreshed diagnostics |
-| `hover` | Get Javadoc and type information |
+| `diagnostics` | Get fresh diagnostics for one file |
+| `symbol_info` | Get hover-style Javadoc and type information |
+| `preview_rename` | Preview symbol rename edits without writing files |
 | `restart_server` | Stop one or all JDT.LS clients and clear runtime state |
 
 The first file-backed call for a project starts JDT.LS lazily and usually
@@ -158,12 +157,48 @@ returns:
 
 Retry the same tool after initialization finishes.
 
+## Tool Behavior
+
+Tools that accept or return `line` and `character` use one-based positions,
+matching editor and agent `Read` output. If your editor shows line 28, pass
+`line=28`; returned ranges use the same convention. Use `document_symbols` to
+discover one-based symbol ranges when you do not already know a position.
+
+Successful navigation tools return normalized items:
+
+```json
+{
+  "items": [
+    {
+      "uri": "file:///path/to/Main.java",
+      "range": {
+        "start": { "line": 12, "character": 8 },
+        "end": { "line": 12, "character": 12 }
+      },
+      "inWorkspace": true
+    }
+  ],
+  "totalItems": 1
+}
+```
+
+`references`, `document_symbols`, `workspace_symbols`, and `diagnostics` return
+paginated results with `items`, `totalItems`, `offset`, `limit`, `hasMore`, and
+`nextOffset`.
+
+`preview_rename` is safe to inspect. It returns a flat list of file URI,
+one-based replacement range, `newText`, and `inWorkspace` values, plus
+`totalEdits`. It does not write to disk.
+
 ## Freshness and Restart
 
 The server tracks open LSP documents and compares disk metadata plus content
 hashes before read-style tool calls. If a file changed outside JDT.LS, the
 server sends a full-document `didChange` and `didSave` before requesting fresh
 language data.
+
+`diagnostics` is file-scoped and always refreshes the target file before
+returning compiler diagnostics.
 
 Use `restart_server` only as a fallback:
 

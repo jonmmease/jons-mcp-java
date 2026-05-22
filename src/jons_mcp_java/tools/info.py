@@ -1,22 +1,24 @@
-"""Info tools: hover."""
+"""Info tools: symbol_info."""
 
 from typing import Any
 
 from jons_mcp_java.constants import LSP_TEXT_DOCUMENT_HOVER
+from jons_mcp_java.schemas import SymbolInfoResult
 from jons_mcp_java.server import mcp
 from jons_mcp_java.tools.common import (
     exception_response,
     prepare_file_tool,
     validate_position,
 )
+from jons_mcp_java.utils import normalize_hover_content, public_position_to_lsp
 
 
 @mcp.tool()
-async def hover(
+async def symbol_info(
     file_path: str,
     line: int,
     character: int,
-) -> dict[str, Any]:
+) -> SymbolInfoResult | dict[str, Any]:
     """Get hover information for a symbol at the given position."""
     position_error = validate_position(line, character)
     if position_error is not None:
@@ -31,7 +33,7 @@ async def hover(
             LSP_TEXT_DOCUMENT_HOVER,
             {
                 "textDocument": {"uri": context.resolved.uri},
-                "position": {"line": line, "character": character},
+                "position": public_position_to_lsp(line, character),
             },
         )
     except Exception as exc:
@@ -41,31 +43,5 @@ async def hover(
             project=context.project,
         )
 
-    if response is None:
-        return {"content": None, "message": "No hover information available"}
-    if not isinstance(response, dict):
-        return {"content": None}
-
-    contents = response.get("contents", {})
-
-    if isinstance(contents, str):
-        return {"content": contents}
-
-    if isinstance(contents, dict):
-        return {"content": contents.get("value", "")}
-
-    if isinstance(contents, list):
-        parts = []
-        for item in contents:
-            if isinstance(item, str):
-                parts.append(item)
-            elif isinstance(item, dict):
-                if "value" in item:
-                    parts.append(item["value"])
-                elif "language" in item:
-                    lang = item.get("language", "")
-                    value = item.get("value", "")
-                    parts.append(f"```{lang}\n{value}\n```")
-        return {"content": "\n\n".join(parts)}
-
-    return {"content": None}
+    content, range_obj = normalize_hover_content(response)
+    return SymbolInfoResult.model_validate({"content": content, "range": range_obj})

@@ -49,15 +49,29 @@ def manager_or_error() -> tuple[JdtlsClientManager | None, dict[str, Any] | None
 
 
 def validate_position(line: int, character: int) -> dict[str, Any] | None:
-    if not isinstance(line, int) or line < 0:
+    if not isinstance(line, int) or line < 1:
         return error_response(
             "invalid_position",
-            "line must be a non-negative integer.",
+            "line must be a positive one-based integer.",
         )
-    if not isinstance(character, int) or character < 0:
+    if not isinstance(character, int) or character < 1:
         return error_response(
             "invalid_position",
-            "character must be a non-negative integer.",
+            "character must be a positive one-based integer.",
+        )
+    return None
+
+
+def validate_pagination(limit: int, offset: int) -> dict[str, Any] | None:
+    if not isinstance(limit, int) or limit < 0:
+        return error_response(
+            "invalid_pagination",
+            "limit must be a non-negative integer.",
+        )
+    if not isinstance(offset, int) or offset < 0:
+        return error_response(
+            "invalid_pagination",
+            "offset must be a non-negative integer.",
         )
     return None
 

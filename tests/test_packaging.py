@@ -27,7 +27,9 @@ def test_wheel_contains_runtime_package_only(tmp_path: Path) -> None:
 
     assert "jons_mcp_java/client.py" in names
     assert "jons_mcp_java/paths.py" in names
+    assert "jons_mcp_java/schemas.py" in names
     assert "jons_mcp_java/tools/common.py" in names
+    assert "jons_mcp_java/tools/refactor.py" in names
     assert "console_scripts" in entry_points
     assert "jons-mcp-java = jons_mcp_java:main" in entry_points
     assert not any("node_modules" in name for name in names)

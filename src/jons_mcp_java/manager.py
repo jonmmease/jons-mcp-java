@@ -381,7 +381,7 @@ class JdtlsClientManager:
             "status": "success",
             "message": f"Restarted server for project: {project.project_root}",
             "project": str(project.project_root),
-            "was_running": was_running,
+            "wasRunning": was_running,
         }
 
     async def restart_all(self) -> dict[str, Any]:

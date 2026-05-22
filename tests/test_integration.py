@@ -4,21 +4,31 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
 
 import pytest
 
-from jons_mcp_java.constants import (
-    LSP_TEXT_DOCUMENT_DOCUMENT_SYMBOL,
-    LSP_TEXT_DOCUMENT_HOVER,
-)
 from jons_mcp_java.manager import JdtlsClientManager
-from jons_mcp_java.utils import path_to_uri
+from jons_mcp_java.schemas import (
+    DiagnosticsResult,
+    DocumentSymbolsResult,
+    RenamePreviewError,
+    RenamePreviewResult,
+    RestartServerResult,
+    SymbolInfoResult,
+)
+from jons_mcp_java.server import _ManagerHolder
+from jons_mcp_java.tools import (
+    diagnostics,
+    document_symbols,
+    preview_rename,
+    restart_server,
+    symbol_info,
+)
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_real_jdtls_startup_hover_symbols_diagnostics_and_restart(
+async def test_real_jdtls_startup_symbol_info_rename_diagnostics_and_restart(
     tmp_path: Path,
 ) -> None:
     if os.environ.get("JONS_MCP_JAVA_RUN_INTEGRATION") != "1":
@@ -45,37 +55,23 @@ async def test_real_jdtls_startup_hover_symbols_diagnostics_and_restart(
     )
 
     manager = JdtlsClientManager(project)
+    _ManagerHolder.instance = manager
     manager.discover_projects()
-    client = await manager.get_client_for_file(java_file)
+    await manager.get_client_for_file(java_file)
 
-    await client.ensure_file_open(java_file)
-    symbol_response = await client.request(
-        LSP_TEXT_DOCUMENT_DOCUMENT_SYMBOL,
-        {"textDocument": {"uri": path_to_uri(java_file)}},
-    )
-    hover_response: Any = await client.request(
-        LSP_TEXT_DOCUMENT_HOVER,
-        {
-            "textDocument": {"uri": path_to_uri(java_file)},
-            "position": {"line": 2, "character": 32},
-        },
-    )
+    symbol_response = await document_symbols(str(java_file), limit=10)
+    info_response = await symbol_info(str(java_file), 3, 34)
+    rename_response = await preview_rename(str(java_file), 3, 14, "Application")
 
-    waiter = manager.create_diagnostics_waiter(java_file)
     java_file.write_text(
         "package demo;\n\npublic class App { MissingType value; }\n",
         encoding="utf-8",
     )
-    changed = await client.ensure_file_open(java_file)
-    diagnostics = (
-        await manager.wait_for_diagnostics(java_file, waiter, timeout=10)
-        if changed
-        else manager.get_diagnostics(java_file)
-    )
+    diagnostics_response = await diagnostics(str(java_file), limit=10)
+    restart_result = await restart_server()
 
-    restart_result = await manager.restart_all()
-
-    assert isinstance(symbol_response, list)
-    assert hover_response is None or isinstance(hover_response, dict)
-    assert isinstance(diagnostics, list)
-    assert restart_result["status"] == "success"
+    assert isinstance(symbol_response, DocumentSymbolsResult)
+    assert isinstance(info_response, SymbolInfoResult)
+    assert isinstance(rename_response, RenamePreviewResult | RenamePreviewError)
+    assert isinstance(diagnostics_response, DiagnosticsResult)
+    assert isinstance(restart_result, RestartServerResult)
