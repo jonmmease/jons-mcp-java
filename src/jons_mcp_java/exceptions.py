@@ -35,8 +35,8 @@ class UnsupportedPlatformError(JdtlsError):
 
 # User-friendly error messages
 ERROR_MESSAGES = {
-    JdtlsNotFoundError: "JDT.LS not found. Install via: brew install jdtls",
-    JavaNotFoundError: "Java not found. Install via: brew install openjdk@21",
+    JdtlsNotFoundError: "JDT.LS not found. Set JDTLS_HOME or install jdtls on PATH.",
+    JavaNotFoundError: "Java not found. Set JAVA_HOME or install Java 21+ on PATH.",
     JavaVersionError: "Java 21+ required. Current version is too old.",
     JdtlsNotInitializedError: "Project is initializing. Please try again in a moment.",
 }

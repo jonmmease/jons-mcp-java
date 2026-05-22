@@ -127,7 +127,8 @@ class JdtlsClient:
 
             if not await self.wait_for_ready(timeout=JDTLS_INIT_TIMEOUT):
                 raise LspRequestError(
-                    f"JDT.LS did not become ready within {JDTLS_INIT_TIMEOUT}s"
+                    f"JDT.LS did not become ready within {JDTLS_INIT_TIMEOUT}s. "
+                    f"Check stderr log for details: {self.stderr_log_path}"
                 )
 
             self._initialized = True
@@ -204,7 +205,7 @@ class JdtlsClient:
 
     def _stderr_loop(self) -> None:
         """Read stderr and log to file."""
-        log_path = self.workspace_data_dir / "jdtls-stderr.log"
+        log_path = self.stderr_log_path
         try:
             with open(log_path, "a", encoding="utf-8") as log_file:
                 while self._running:
@@ -226,16 +227,25 @@ class JdtlsClient:
             if self._running:
                 logger.error("Stderr reader error: %s", e)
 
+    @property
+    def stderr_log_path(self) -> Path:
+        """Path where JDT.LS stderr is recorded."""
+        return self.workspace_data_dir / "jdtls-stderr.log"
+
     def _start_process_watcher(self) -> None:
         """Watch for process death and cancel pending requests."""
         def watcher() -> None:
             if self._process:
                 self._process.wait()  # Blocks until process exits
             if not self._shutting_down and self._running:
-                logger.error("JDT.LS process died unexpectedly")
+                message = (
+                    "JDT.LS process died. Check stderr log for details: "
+                    f"{self.stderr_log_path}"
+                )
+                logger.error(message)
                 self._running = False
                 self._initialized = False
-                self._cancel_pending_requests(LspRequestError("JDT.LS process died"))
+                self._cancel_pending_requests(LspRequestError(message))
 
         self._watcher_thread = threading.Thread(target=watcher, daemon=True)
         self._watcher_thread.start()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -171,3 +172,23 @@ def test_reader_loop_skips_non_lsp_stdout_and_reads_message(tmp_path: Path) -> N
     client._reader_loop()
 
     assert client._message_queue.get_nowait() == message
+
+
+class ExitedProcess:
+    def wait(self) -> int:
+        return 1
+
+
+@pytest.mark.asyncio
+async def test_process_death_error_points_to_stderr_log(tmp_path: Path) -> None:
+    client = JdtlsClient(tmp_path, tmp_path / ".jdtls")
+    client._process = ExitedProcess()  # type: ignore[assignment]
+    client._running = True
+    client._loop = asyncio.get_running_loop()
+    future: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
+    client._pending_requests[1] = future
+
+    client._start_process_watcher()
+
+    with pytest.raises(LspRequestError, match="jdtls-stderr.log"):
+        await future

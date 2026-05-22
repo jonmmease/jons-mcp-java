@@ -24,7 +24,13 @@ brew install openjdk@21 jdtls
 ```
 
 If Java is not on your PATH, set `JAVA_HOME`. If JDT.LS is installed somewhere
-custom, set `JDTLS_HOME`.
+custom, set `JDTLS_HOME`. The server also tries to resolve a `jdtls`
+executable on PATH.
+
+If `JDTLS_HOME` points at a read-only install such as the Nix store, the server
+copies the small platform `config_<os>` directory into a writable cache under
+`$XDG_CACHE_HOME/jons-mcp-java` or `~/.cache/jons-mcp-java`. Set
+`JDTLS_CONFIG_DIR` to choose a specific writable configuration directory.
 
 ## Install and Run
 
@@ -219,7 +225,7 @@ restart lazily on the next file-backed tool call.
 
 ## Troubleshooting
 
-- `JDT.LS not found`: install JDT.LS or set `JDTLS_HOME`.
+- `JDT.LS not found`: install JDT.LS, put `jdtls` on PATH, or set `JDTLS_HOME`.
 - `Java 21+ required`: install Java 21+ or set `JAVA_HOME`.
 - `project_not_found`: the file is inside the workspace, but not under a
   discovered Gradle root.
@@ -227,3 +233,5 @@ restart lazily on the next file-backed tool call.
   the configured workspace root.
 - `project_startup_failed`: the project import failed; check the JDT.LS stderr
   log under the generated workspace data directory in `~/.cache/jdtls-workspaces`.
+- Read-only `JDTLS_HOME`: set `JDTLS_CONFIG_DIR` to a writable directory, or let
+  the server create its cached config copy automatically.
