@@ -5,6 +5,10 @@ MCP server that provides Java language intelligence through Eclipse JDT.LS.
 This project is currently intended to be installed from a source checkout or
 from GitHub. It is not documented as a PyPI package.
 
+The current public API is aligned with `jons-mcp-typescript`: public positions
+are one-based, successful tool responses use structured `items` and pagination
+shapes, and refactoring previews are read-only.
+
 ## Requirements
 
 - Python 3.10+
@@ -108,13 +112,13 @@ The configured workspace root is the filesystem security boundary.
 
 - Tool paths may be workspace-relative paths, absolute in-workspace paths, or
   `file://` URIs.
-- Relative paths are resolved from `JONS_MCP_JAVA_WORKSPACE`, not from the MCP
-  server process cwd.
+- Relative paths are resolved from the configured workspace root, not from the
+  MCP server process cwd.
 - Paths containing `..`, paths outside the workspace, non-file URIs, malformed
   URIs, missing files, and symlink escapes are rejected before any filesystem or
   JDT.LS access.
-- LSP locations outside the workspace may still be returned as locations, but
-  the server does not open or read external files.
+- LSP locations outside the workspace may still be returned with
+  `"inWorkspace": false`, but the server does not open or read external files.
 
 Path and startup failures use a stable error shape:
 
@@ -186,6 +190,10 @@ Successful navigation tools return normalized items:
 paginated results with `items`, `totalItems`, `offset`, `limit`, `hasMore`, and
 `nextOffset`.
 
+Navigation tools preserve JDT.LS result order and return `items` plus
+`totalItems`. `references`, diagnostics, and symbol lists are sorted
+deterministically before pagination.
+
 `preview_rename` is safe to inspect. It returns a flat list of file URI,
 one-based replacement range, `newText`, and `inWorkspace` values, plus
 `totalEdits`. It does not write to disk.
@@ -216,6 +224,6 @@ restart lazily on the next file-backed tool call.
 - `project_not_found`: the file is inside the workspace, but not under a
   discovered Gradle root.
 - `path_outside_workspace`: the path resolves outside
-  `JONS_MCP_JAVA_WORKSPACE`.
+  the configured workspace root.
 - `project_startup_failed`: the project import failed; check the JDT.LS stderr
   log under the generated workspace data directory in `~/.cache/jdtls-workspaces`.
