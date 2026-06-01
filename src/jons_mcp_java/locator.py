@@ -6,6 +6,7 @@ import os
 import platform
 import re
 import shutil
+import stat
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -216,16 +217,38 @@ def _cached_config_dir(jdtls_home: Path, config_name: str) -> Path:
 def _prepare_writable_config_dir(source_config_dir: Path, config_dir: Path) -> None:
     """Copy bundled config files into config_dir and ensure it is writable."""
     if source_config_dir.resolve() == config_dir.resolve():
+        _make_tree_user_writable(config_dir)
         if not _directory_is_writable(config_dir):
             raise JdtlsNotFoundError(
                 f"JDT.LS config directory is not writable: {config_dir}"
             )
         return
 
+    if config_dir.exists():
+        _make_tree_user_writable(config_dir)
     config_dir.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source_config_dir, config_dir, dirs_exist_ok=True)
+    _make_tree_user_writable(config_dir)
     if not _directory_is_writable(config_dir):
         raise JdtlsNotFoundError(f"JDT.LS config directory is not writable: {config_dir}")
+
+
+def _make_tree_user_writable(path: Path) -> None:
+    """Make an extracted/copied config tree writable by the current user."""
+    if not path.exists():
+        return
+
+    for item in [path, *path.rglob("*")]:
+        if item.is_symlink():
+            continue
+        try:
+            current_mode = stat.S_IMODE(item.stat().st_mode)
+            user_bits = stat.S_IRUSR | stat.S_IWUSR
+            if item.is_dir():
+                user_bits |= stat.S_IXUSR
+            item.chmod(current_mode | user_bits)
+        except OSError:
+            logger.debug("Could not adjust permissions for %s", item, exc_info=True)
 
 
 def _directory_is_writable(path: Path) -> bool:

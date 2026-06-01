@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import stat
 from pathlib import Path
 
 import pytest
@@ -51,6 +52,49 @@ def test_get_config_dir_copies_read_only_install_config_to_cache(
     assert (config_dir / "config.ini").read_text(encoding="utf-8") == (
         "eclipse.product=jdt.ls\n"
     )
+
+
+def test_get_config_dir_repairs_read_only_copied_config_modes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    jdtls_home = make_jdtls_home(tmp_path / "install")
+    source_config = jdtls_home / "config_linux"
+    config_ini = source_config / "config.ini"
+    cache_root = tmp_path / "cache"
+    monkeypatch.setenv("XDG_CACHE_HOME", str(cache_root))
+    source_config.chmod(0o555)
+    config_ini.chmod(0o444)
+
+    try:
+        config_dir = locator.get_config_dir(jdtls_home)
+
+        assert config_dir != source_config
+        assert config_dir.stat().st_mode & stat.S_IWUSR
+        assert (config_dir / "config.ini").stat().st_mode & stat.S_IWUSR
+        assert locator._directory_is_writable(config_dir)
+    finally:
+        config_ini.chmod(0o644)
+        source_config.chmod(0o755)
+
+
+def test_prepare_writable_config_dir_repairs_existing_read_only_cache(
+    tmp_path: Path,
+) -> None:
+    jdtls_home = make_jdtls_home(tmp_path / "install")
+    source_config = jdtls_home / "config_linux"
+    cached_config = tmp_path / "cache" / "config_linux"
+    cached_config.mkdir(parents=True)
+    cached_ini = cached_config / "config.ini"
+    cached_ini.write_text("old\n", encoding="utf-8")
+    cached_ini.chmod(0o444)
+    cached_config.chmod(0o555)
+
+    locator._prepare_writable_config_dir(source_config, cached_config)
+
+    assert cached_config.stat().st_mode & stat.S_IWUSR
+    assert cached_ini.stat().st_mode & stat.S_IWUSR
+    assert cached_ini.read_text(encoding="utf-8") == "eclipse.product=jdt.ls\n"
 
 
 def test_get_config_dir_honors_override_and_copies_source_config(

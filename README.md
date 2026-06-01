@@ -30,7 +30,9 @@ executable on PATH.
 If `JDTLS_HOME` points at a read-only install such as the Nix store, the server
 copies the small platform `config_<os>` directory into a writable cache under
 `$XDG_CACHE_HOME/jons-mcp-java` or `~/.cache/jons-mcp-java`. Set
-`JDTLS_CONFIG_DIR` to choose a specific writable configuration directory.
+`JDTLS_CONFIG_DIR` to choose a specific writable configuration directory. The
+cached copy is repaired to be user-writable even when the source archive or
+package ships read-only mode bits.
 
 ## Install and Run
 
@@ -234,4 +236,4 @@ restart lazily on the next file-backed tool call.
 - `project_startup_failed`: the project import failed; check the JDT.LS stderr
   log under the generated workspace data directory in `~/.cache/jdtls-workspaces`.
 - Read-only `JDTLS_HOME`: set `JDTLS_CONFIG_DIR` to a writable directory, or let
-  the server create its cached config copy automatically.
+  the server create and permission-repair its cached config copy automatically.
