@@ -4,10 +4,14 @@ import argparse
 import logging
 import os
 import sys
+from importlib.metadata import PackageNotFoundError, version
 
 from jons_mcp_java.server import mcp
 
-__version__ = "0.1.0"
+try:
+    __version__ = version("jons-mcp-java")
+except PackageNotFoundError:
+    __version__ = "0+unknown"
 
 
 def main() -> None:
@@ -27,4 +31,4 @@ def main() -> None:
     mcp.run()
 
 
-__all__ = ["main", "mcp"]
+__all__ = ["__version__", "main", "mcp"]

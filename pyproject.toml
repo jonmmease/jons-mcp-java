@@ -1,16 +1,15 @@
 [project]
 name = "jons-mcp-java"
-version = "0.1.0"
+dynamic = ["version"]
 description = "MCP server providing Java development capabilities through Eclipse JDT.LS"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "Jon Mease" }]
 keywords = ["mcp", "java", "jdtls", "lsp", "development"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -47,11 +46,17 @@ dev = [
 jons-mcp-java = "jons_mcp_java:main"
 
 [build-system]
-requires = ["hatchling>=1.29.0,<2"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=80", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/jons_mcp_java"]
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools_scm]
+fallback_version = "0.0.0"
 
 [tool.black]
 line-length = 88
