@@ -5,17 +5,33 @@ description = "MCP server providing Java development capabilities through Eclips
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Jon Mease" }]
-keywords = ["mcp", "java", "jdtls", "lsp", "development"]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "java",
+    "jdtls",
+    "lsp",
+    "language-server",
+    "gradle",
+    "development",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
+    "Environment :: Console",
     "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Java",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Quality Assurance",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Editors :: Integrated Development Environments (IDE)",
 ]
 
 dependencies = [
@@ -45,6 +61,12 @@ dev = [
 [project.scripts]
 jons-mcp-java = "jons_mcp_java:main"
 
+[project.urls]
+Homepage = "https://github.com/jonmmease/jons-mcp-java"
+Repository = "https://github.com/jonmmease/jons-mcp-java"
+Issues = "https://github.com/jonmmease/jons-mcp-java/issues"
+Changelog = "https://github.com/jonmmease/jons-mcp-java/releases"
+
 [build-system]
 requires = ["setuptools>=80", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
@@ -56,7 +78,6 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools_scm]
-fallback_version = "0.0.0"
 
 [tool.black]
 line-length = 88

@@ -2,8 +2,8 @@
 
 MCP server that provides Java language intelligence through Eclipse JDT.LS.
 
-This project is currently intended to be installed from a source checkout or
-from GitHub. It is not documented as a PyPI package.
+Released packages are available from PyPI. Development versions can also be run
+from a source checkout or directly from GitHub.
 
 The current public API is aligned with `jons-mcp-typescript`: public positions
 are one-based, successful tool responses use structured `items` and pagination
@@ -36,6 +36,12 @@ package ships read-only mode bits.
 
 ## Install and Run
 
+From PyPI:
+
+```bash
+uvx jons-mcp-java /path/to/java-workspace
+```
+
 From a source checkout:
 
 ```bash
@@ -59,6 +65,13 @@ relative tool paths are resolved from this workspace root.
 
 ## MCP Client Examples
 
+Claude Code using PyPI:
+
+```bash
+claude mcp add jons-mcp-java \
+  -- uvx jons-mcp-java /path/to/java-workspace
+```
+
 Claude Code using a source checkout:
 
 ```bash
@@ -73,6 +86,13 @@ Claude Code using GitHub:
 claude mcp add jons-mcp-java \
   -- uvx --from git+https://github.com/jonmmease/jons-mcp-java.git \
   jons-mcp-java /path/to/java-workspace
+```
+
+Codex CLI using PyPI:
+
+```bash
+codex mcp add jons-mcp-java \
+  -- uvx jons-mcp-java /path/to/java-workspace
 ```
 
 Codex CLI using GitHub:
@@ -91,8 +111,6 @@ codex mcp add jons-mcp-java \
     "jons-mcp-java": {
       "command": "uvx",
       "args": [
-        "--from",
-        "git+https://github.com/jonmmease/jons-mcp-java.git",
         "jons-mcp-java",
         "/path/to/java-workspace"
       ]
@@ -107,8 +125,6 @@ Codex TOML:
 [mcp_servers.jons-mcp-java]
 command = "uvx"
 args = [
-  "--from",
-  "git+https://github.com/jonmmease/jons-mcp-java.git",
   "jons-mcp-java",
   "/path/to/java-workspace",
 ]
