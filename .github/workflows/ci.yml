@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Run Ruff
+        run: uv run ruff check .
+
+      - name: Run mypy
+        run: uv run mypy src
+
+      - name: Build wheel
+        run: |
+          rm -rf build src/jons_mcp_java.egg-info dist
+          uv build --wheel --out-dir dist
+          python - <<'PY'
+          import glob
+          import sys
+
+          wheels = glob.glob("dist/*.whl")
+          if len(wheels) != 1:
+              print(f"Expected exactly one wheel, found {len(wheels)}: {wheels}", file=sys.stderr)
+              sys.exit(1)
+          print(wheels[0])
+          PY
